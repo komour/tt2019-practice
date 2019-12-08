@@ -1,3 +1,8 @@
+open Hashtbl
+open String
+
+module Set = Set.Make(String)
+
 type variable = 
     Id of string
 ;;
