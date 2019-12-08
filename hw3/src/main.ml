@@ -1,5 +1,6 @@
 open Grammar
 open Utils
+open List
 
 exception No_Type
 
@@ -13,7 +14,7 @@ let print_indent n =
 
 let get_lambda_name () = 
   lambda_counter := !lambda_counter + 1;
-  "l" ^ string_of_int !lambda_counter
+  string_of_int !lambda_counter
 
 let get_name () = 
   counter := !counter + 1;
@@ -106,8 +107,8 @@ let solve expr =
 
           | Abst ( Id x, t )        ->  let x_type = Vart( get_name () ) in
                                           Hashtbl.add types_map x x_type;
-                                          let t_type = type_inference t in
                                             let new_lambda_name = get_lambda_name () in 
+                                            let t_type = type_inference t in
                                             let new_x_type = Hashtbl.find types_map x in
                                             (*print_string (print_types new_x_type);*)
                                             Hashtbl.add lambda_map new_lambda_name x;
@@ -159,24 +160,70 @@ let solve expr =
           let free_set = get_set_with_free_vars expr in
           let expr_type = type_inference expr in
           let context = make_context free_set types_map expr in
-            let rec print_all expr' n = (
+            lambda_counter := 0;
+          let advanced = ref Set.empty in
+
+            let rec get_all tree number = 
+            match tree with
+            | Var ( Id v )            -> Hashtbl.find types_map v
+            | Appl ( _M, _N )         -> (
+                                          let m_type = get_all _M number in
+                                          match m_type with
+                                          | Impl (_, res) -> res
+                                        )
+            | Abst ( Id x, t )        ->  let x_type = Hashtbl.find types_map (string_of_int number) in
+                                          let t_type = get_all t (number + 1) in
+                                          Impl(x_type, t_type)
+            in
+            let rec print_all expr n = (
               match expr with
               | Var ( Id v )            ->  print_indent n;
                                             print_string context;
+                                             Set.iter (fun abc -> print_string( print_string ", ";
+                                              print_string (Hashtbl.find lambda_map abc);
+                                              print_string " : ";
+                                              print_types(Hashtbl.find types_map abc)); 
+                                            ) !advanced;
                                             print_string turniket;
                                             print_string (v ^ " : ");
-                                            print_string ((print_types (Hashtbl.find types_map v)) ^ " [rule #1]")
+                                            print_string ((print_types (Hashtbl.find types_map v)) ^ " [rule #1]\n")
 
-              | Abst ( Id x, t )        -> 
+              | Abst ( Id x, t )        -> let ocherednoy = get_lambda_name () in 
+                                           advanced := Set.union (!advanced) (Set.singleton ocherednoy);
+                                           print_indent n;
+                                           print_string context;
+                                           Set.iter (fun abc -> print_string( print_string ", ";
+                                              print_string (Hashtbl.find lambda_map abc);
+                                              print_string " : ";
+                                              print_types(Hashtbl.find types_map abc)); 
+                                            ) !advanced;
+                                           print_string turniket;
+                                           print_string ((print_expr expr) ^ " : ");
+                                           print_string (print_types (get_all expr (int_of_string ocherednoy)));
+                                           print_string " [rule #3]\n";
+                                           print_all t (n + 1);
+                                           advanced := Set.remove ocherednoy !advanced;
+
+
 
               | Appl ( _M, _N )         -> print_indent n;
                                            print_string context;
+                                           (* if ((String.length context) > 0) then *)
+                                            Set.iter (fun abc -> print_string( print_string ", ";
+                                              print_string (Hashtbl.find lambda_map abc);
+                                              print_string " : ";
+                                              print_types(Hashtbl.find types_map abc)); 
+                                            ) !advanced;
+                                            
                                            print_string turniket;
                                            print_string ((print_expr expr) ^ " : ");
+                                           print_string (print_types (get_all expr !lambda_counter));
+                                           print_string " [rule #2]\n";
+                                           print_all _M (n + 1);
+                                           print_all _N (n + 1)
 
 
-            ) in 
-            print_all expr' 0
+            ) in print_all expr 0
      ) with No_Type -> print_string "Expression has no type\n"
 ;;
 
