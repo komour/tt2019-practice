@@ -108,6 +108,7 @@ let solve expr =
           | Abst ( Id x, t )        ->  let x_type = Vart( get_name () ) in
                                           Hashtbl.add types_map x x_type;
                                             let new_lambda_name = get_lambda_name () in 
+                                            (* print_string "\n\n\n"; print_string new_lambda_name; print_string "\n\n\n"; *)
                                             let t_type = type_inference t in
                                             let new_x_type = Hashtbl.find types_map x in
                                             (*print_string (print_types new_x_type);*)
@@ -162,59 +163,109 @@ let solve expr =
           let context = make_context free_set types_map expr in
             lambda_counter := 0;
           let advanced = ref Set.empty in
-
+          let binds = Hashtbl.create 512 in
+            (* let binds2 = Hashtbl.create 512 in *)
             let rec get_all tree number = 
             match tree with
-            | Var ( Id v )            -> Hashtbl.find types_map v
+            | Var ( Id v )            -> if Hashtbl.mem binds v then begin
+                                            (* print_string " (keke) "; *)
+                                           Hashtbl.find types_map (Hashtbl.find binds v)
+                                          end 
+                                         else begin 
+                                            (* print_string " (keke1) "; *)
+                                          Hashtbl.find types_map v
+                                        end
             | Appl ( _M, _N )         -> (
                                           let m_type = get_all _M number in
+                                          (* print_string " keke "; *)
                                           match m_type with
                                           | Impl (_, res) -> res
                                         )
             | Abst ( Id x, t )        ->  let x_type = Hashtbl.find types_map (string_of_int number) in
+                                          Hashtbl.add binds x (string_of_int number);
                                           let t_type = get_all t (number + 1) in
+                                          Hashtbl.remove binds x;
                                           Impl(x_type, t_type)
             in
+            let flag = ref true in
             let rec print_all expr n = (
               match expr with
               | Var ( Id v )            ->  print_indent n;
                                             print_string context;
-                                             Set.iter (fun abc -> print_string( print_string ", ";
+
+                                           if ((String.length context) > 0) then
+                                             Set.iter (fun abc -> 
+                                              print_string ", ";
                                               print_string (Hashtbl.find lambda_map abc);
                                               print_string " : ";
-                                              print_types(Hashtbl.find types_map abc)); 
-                                            ) !advanced;
+                                              print_string (print_types(Hashtbl.find types_map abc))  
+                                            ) !advanced
+                                            else begin
+                                             flag := true;
+                                             Set.iter (fun abc -> 
+                                              if !flag then flag := false else print_string ", ";
+                                              print_string (Hashtbl.find lambda_map abc);
+                                              print_string " : ";
+                                              print_string (print_types(Hashtbl.find types_map abc))  
+                                            ) !advanced end;
+
                                             print_string turniket;
                                             print_string (v ^ " : ");
+                                            if not (Hashtbl.mem binds v) then
                                             print_string ((print_types (Hashtbl.find types_map v)) ^ " [rule #1]\n")
+                                          else begin (* print_string " keke "; *)
+                                            print_string ((print_types (Hashtbl.find types_map ( Hashtbl.find binds v ))) ^ " [rule #1]\n")
+                                          end
 
               | Abst ( Id x, t )        -> let ocherednoy = get_lambda_name () in 
-                                           advanced := Set.union (!advanced) (Set.singleton ocherednoy);
                                            print_indent n;
                                            print_string context;
-                                           Set.iter (fun abc -> print_string( print_string ", ";
+                                           if ((String.length context) > 0) then
+                                             Set.iter (fun abc -> 
+                                              print_string ", ";
                                               print_string (Hashtbl.find lambda_map abc);
                                               print_string " : ";
-                                              print_types(Hashtbl.find types_map abc)); 
-                                            ) !advanced;
+                                              print_string (print_types(Hashtbl.find types_map abc))  
+                                            ) !advanced
+                                            else begin
+                                             flag := true;
+                                             Set.iter (fun abc -> 
+                                              if !flag then flag := false else print_string ", ";
+                                              print_string (Hashtbl.find lambda_map abc);
+                                              print_string " : ";
+                                              print_string (print_types(Hashtbl.find types_map abc))  
+                                            ) !advanced end;
+
                                            print_string turniket;
                                            print_string ((print_expr expr) ^ " : ");
                                            print_string (print_types (get_all expr (int_of_string ocherednoy)));
                                            print_string " [rule #3]\n";
+                                           Hashtbl.add binds x ocherednoy;
+                                           advanced := Set.union (!advanced) (Set.singleton ocherednoy);
                                            print_all t (n + 1);
                                            advanced := Set.remove ocherednoy !advanced;
+                                           Hashtbl.remove binds ocherednoy
+
 
 
 
               | Appl ( _M, _N )         -> print_indent n;
                                            print_string context;
-                                           (* if ((String.length context) > 0) then *)
-                                            Set.iter (fun abc -> print_string( print_string ", ";
+                                           if ((String.length context) > 0) then
+                                             Set.iter (fun abc -> 
+                                              print_string ", ";
                                               print_string (Hashtbl.find lambda_map abc);
                                               print_string " : ";
-                                              print_types(Hashtbl.find types_map abc)); 
-                                            ) !advanced;
-                                            
+                                              print_string (print_types(Hashtbl.find types_map abc))  
+                                            ) !advanced
+                                            else begin
+                                             flag := true;
+                                             Set.iter (fun abc -> 
+                                              if !flag then flag := false else print_string ", ";
+                                              print_string (Hashtbl.find lambda_map abc);
+                                              print_string " : ";
+                                              print_string (print_types(Hashtbl.find types_map abc))  
+                                            ) !advanced end;
                                            print_string turniket;
                                            print_string ((print_expr expr) ^ " : ");
                                            print_string (print_types (get_all expr !lambda_counter));
