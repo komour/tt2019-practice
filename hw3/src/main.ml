@@ -61,7 +61,7 @@ let solve_system (term1, term2) =
     | (Impl(l1, r1), Impl(l2, r2))  -> rec_solve (l1, l2);
                                        rec_solve (r1, r2) 
     in rec_solve (term1, term2);
-      (system_map, (!counter - 1))
+      (system_map, (!counter))
 
 let big_sub system_map term =
   let rec do_sub tree = 
@@ -87,83 +87,16 @@ let a_lot_subs types_map system_map =
 
 let turniket = "|- "
 
+let sys2counter = ref 0
+
 
 let solve expr = 
      try
      (
       let types_map = Hashtbl.create 512 in
       let lambda_map = Hashtbl.create 512 in
-      let sys2_map = Hashtbl.create 512 in
-        let rec type_inference expr = 
-        (
-          match expr with
-          | Var ( Id v )            ->  if Hashtbl.mem types_map v then 
-                                          Hashtbl.find types_map v 
-                                        else
-                                          let v_type = Vart ( get_name () ) in
-                                          Hashtbl.add types_map v v_type;
-                                          v_type
-
-
-          | Abst ( Id x, t )        ->  let x_type = Vart( get_name () ) in
-                                          Hashtbl.add types_map x x_type;
-                                            let new_lambda_name = get_lambda_name () in 
-                                            (* print_string "\n\n\n"; print_string new_lambda_name; print_string "\n\n\n"; *)
-                                            let t_type = type_inference t in
-                                            let new_x_type = Hashtbl.find types_map x in
-                                            (*print_string (print_types new_x_type);*)
-                                            Hashtbl.add lambda_map new_lambda_name x;
-                                            Hashtbl.remove types_map x;
-                                            Hashtbl.add types_map new_lambda_name new_x_type;
-                                              Impl (new_x_type, t_type)
-
-
-          | Appl ( _M, _N )         ->  let m_type' = ref (type_inference _M) in
-                                        let n_type = type_inference _N in
-                                        let m_type = big_sub sys2_map !m_type' in
-                                        (*print_string ("f: " ^ (print_types (Hashtbl.find types_map "f")) ^ "\n");*)
-                                        (*m_type' := type_inference _M;
-                                                                            let m_type = !m_type' in*)
-                                        (*print_string ((print_types m_type) ^ " " ^ (print_types n_type) ^ "\n");*)
-                                        let micro_inf (term1, term2) = 
-                                            match (term1, term2) with  
-
-                                            | (Vart a, tree)                 -> let b = Vart ( get_name () ) in
-                                                                                let new_a = Impl (tree, b) in
-                                                                                  no_type_checker a tree;
-                                                                                  change_map types_map a new_a; 
-                                                                                  Hashtbl.remove sys2_map a;
-                                                                                  Hashtbl.add sys2_map a new_a;
-                                                                                  b
-                                            | (Impl(t11, t12), Vart v)       -> no_type_checker v t11;
-                                                                                change_map types_map v t11;
-                                                                                Hashtbl.remove sys2_map v;
-                                                                                Hashtbl.add sys2_map v t11;
-                                                                                sub_term t12 v t11
-                                          
-                                                                                                  (* check if v in t11 *)
-                                            | (Impl(tree1, res_type), tree2) -> let (system_map, count) = solve_system (tree1, tree2) in
-                                                                                for i = 0 to count do
-                                                                                  a_lot_subs types_map system_map
-                                                                                done;
-                                                                                let res = ref res_type in
-                                                                                for i = 0 to count do
-                                                                                  res := big_sub system_map !res
-                                                                                done;
-                                                                                !res
-
-
-
-                                        in micro_inf ( m_type, n_type )
-
-                                
-          ) in
-          let free_set = get_set_with_free_vars expr in
-          let expr_type = type_inference expr in
-          let context = make_context free_set types_map expr in
-            lambda_counter := 0;
-          let advanced = ref Set.empty in
-          let binds = Hashtbl.create 512 in
+      (* let sys2_map = Hashtbl.create 512 in *)
+      let binds = Hashtbl.create 512 in
             (* let binds2 = Hashtbl.create 512 in *)
             let rec get_all tree number = 
             match tree with
@@ -188,6 +121,84 @@ let solve expr =
                                           Hashtbl.remove binds x;
                                           Impl(x_type, t_type)
             in
+
+        let rec type_inference expr = 
+        (
+          match expr with
+          | Var ( Id v )            ->  if Hashtbl.mem types_map v then 
+                                          Hashtbl.find types_map v 
+                                        else
+                                          let v_type = Vart ( get_name () ) in
+                                          Hashtbl.add types_map v v_type;
+                                          v_type
+
+
+          | Abst ( Id x, t )        ->  let x_type = Vart( get_name () ) in
+                                          Hashtbl.add types_map x x_type;
+                                            let new_lambda_name = get_lambda_name () in 
+                                            (* print_string "\n\n\n"; print_string new_lambda_name; print_string "\n\n\n"; *)
+                                            let t_type = type_inference t in
+                                            let new_x_type = Hashtbl.find types_map x in
+                                            (*print_string (print_types new_x_type);*)
+                                            Hashtbl.add lambda_map new_lambda_name x;
+                                            Hashtbl.remove types_map x;
+                                            Hashtbl.add types_map new_lambda_name new_x_type;
+                                              Impl (new_x_type, t_type)
+
+
+
+(* научиться изменять прошлое значение - мы посчитали левую часть, потом правую. левая изменилась в процессе подсчета правой - надо сделать актуальной *)
+
+          | Appl ( _M, _N )         ->  let tempc = !lambda_counter in 
+                                        let m_type' = ref (type_inference _M) in
+                                        let n_type = type_inference _N in
+                                        let m_type = get_all _M (tempc) in
+                                        (*print_string ("f: " ^ (print_types (Hashtbl.find types_map "f")) ^ "\n");*)
+                                        (*m_type' := type_inference _M;
+                                                                            let m_type = !m_type' in*)
+                                        (*print_string ((print_types m_type) ^ " " ^ (print_types n_type) ^ "\n");*)
+                                        let micro_inf (term1, term2) = 
+                                            match (term1, term2) with  
+
+                                            | (Vart a, tree)                 -> let b = Vart ( get_name () ) in
+                                                                                let new_a = Impl (tree, b) in
+                                                                                  no_type_checker a tree;
+                                                                                  change_map types_map a new_a; 
+                                                                                  (* Hashtbl.remove sys2_map a; *)
+                                                                                  (* Hashtbl.add sys2_map a new_a; *)
+                                                                                  (* sys2counter := !sys2counter + 1 *)
+                                                                                  b
+                                            | (Impl(t11, t12), Vart v)       -> no_type_checker v t11;
+                                                                                change_map types_map v t11;
+                                                                                (* Hashtbl.remove sys2_map v; *)
+                                                                                (* Hashtbl.add sys2_map v t11; *)
+                                                                                (* sys2counter := !sys2counter + 1 *)
+                                                                                sub_term t12 v t11
+                                          
+                                                                                                  (* check if v in t11 *)
+                                            | (Impl(tree1, res_type), tree2) -> let (system_map, count) = solve_system (tree1, tree2) in
+                                                                                for i = 0 to count do
+                                                                                  a_lot_subs types_map system_map(* ;
+                                                                                  a_lot_subs sys2_map system_map *)
+                                                                                done;
+                                                                                let res = ref res_type in
+                                                                                for i = 0 to count do
+                                                                                  res := big_sub system_map !res
+                                                                                done;
+                                                                                !res
+
+
+
+                                        in micro_inf ( m_type, n_type )
+
+                                
+          ) in
+          let free_set = get_set_with_free_vars expr in
+          let expr_type = type_inference expr in
+          let context = make_context free_set types_map expr in
+            lambda_counter := 0;
+          let advanced = ref Set.empty in
+            (*get_all was here *)
             let flag = ref true in
             let rec print_all expr n = (
               match expr with
