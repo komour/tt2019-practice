@@ -64,59 +64,69 @@ let solve_system (term1, term2) =
       (system_map, (!counter))
 
 let big_sub system_map term =
+  let was_change = ref true in
+  let ret = ref term in
   let rec do_sub tree = 
     match tree with
-    | Vart v              -> if Hashtbl.mem system_map v then Hashtbl.find system_map v else tree
+    | Vart v              -> if Hashtbl.mem system_map v then begin was_change := true; Hashtbl.find system_map v end
+                               else tree
     | Impl (tree1, tree2) -> Impl (do_sub tree1, do_sub tree2)
-  in do_sub term
+  in
+  while !was_change do
+    was_change := false;
+    ret := do_sub !ret
+  done;
+  !ret
 
 
 
 let a_lot_subs types_map system_map =
-  Hashtbl.iter 
-  (
-    fun key value ->
+  let was_change = ref true in 
+  while !was_change do
+    was_change := false;
+    Hashtbl.iter 
     (
-      let new_type = big_sub system_map value in 
-        Hashtbl.remove types_map key;
-        Hashtbl.add types_map key new_type
-    )
-  ) types_map
+      fun key value ->
+      (
+          let new_type = big_sub system_map value in 
+            if (not (new_type = value)) then was_change := true else was_change := !was_change;
+            Hashtbl.remove types_map key;
+            Hashtbl.add types_map key new_type
+      )
+    ) types_map 
+  done
 
 
 
 let turniket = "|- "
-
-let sys2counter = ref 0
-
 
 let solve expr = 
      try
      (
       let types_map = Hashtbl.create 512 in
       let lambda_map = Hashtbl.create 512 in
+      let counter_temp = ref 0 in
       (* let sys2_map = Hashtbl.create 512 in *)
       let binds = Hashtbl.create 512 in
             (* let binds2 = Hashtbl.create 512 in *)
             let rec get_all tree number = 
             match tree with
             | Var ( Id v )            -> if Hashtbl.mem binds v then begin
-                                            (* print_string " (keke) "; *)
                                            Hashtbl.find types_map (Hashtbl.find binds v)
                                           end 
                                          else begin 
-                                            (* print_string " (keke1) "; *)
                                           Hashtbl.find types_map v
                                         end
             | Appl ( _M, _N )         -> (
                                           let m_type = get_all _M number in
-                                           (* print_string " keke ";  *)
+                                          (* print_string (print_types m_type); *)
+                                          (* print_string " keke \n"; *)
                                           match m_type with
                                           | Impl (_, res) -> res
                                         )
             | Abst ( Id x, t )        ->  let x_type = Hashtbl.find types_map (string_of_int (number+1)) in
-                                          (* print_string " keke\n "; *)
                                           Hashtbl.add binds x (string_of_int (number+1));
+                                          counter_temp := !counter_temp + 1;
                                           let t_type = get_all t (number + 1) in
                                           Hashtbl.remove binds x;
                                           Impl(x_type, t_type)
@@ -136,10 +146,8 @@ let solve expr =
           | Abst ( Id x, t )        ->  let x_type = Vart( get_name () ) in
                                           Hashtbl.add types_map x x_type;
                                             let new_lambda_name = get_lambda_name () in 
-                                            (* print_string "\n\n\n"; print_string new_lambda_name; print_string "\n\n\n"; *)
                                             let t_type = type_inference t in
                                             let new_x_type = Hashtbl.find types_map x in
-                                            (*print_string (print_types new_x_type);*)
                                             Hashtbl.add lambda_map new_lambda_name x;
                                             Hashtbl.remove types_map x;
                                             Hashtbl.add types_map new_lambda_name new_x_type;
@@ -147,16 +155,14 @@ let solve expr =
 
 
 
-(* научиться изменять прошлое значение - мы посчитали левую часть, потом правую. левая изменилась в процессе подсчета правой - надо сделать актуальной *)
 
           | Appl ( _M, _N )         ->  let tempc = !lambda_counter in 
+                                        counter_temp := 0;
                                         let m_type' = ref (type_inference _M) in
-                                        let n_type = type_inference _N in
+                                        let n_type = (type_inference _N) in
                                         let m_type = get_all _M (tempc) in
-                                        (*print_string ("f: " ^ (print_types (Hashtbl.find types_map "f")) ^ "\n");*)
-                                        (*m_type' := type_inference _M;
-                                                                            let m_type = !m_type' in*)
-                                        (*print_string ((print_types m_type) ^ " " ^ (print_types n_type) ^ "\n");*)
+                                        (* let n_type = get_all _N (tempc + !counter_temp) in *)
+                                        (* if (tempc = 0) then print_string ( (print_types m_type) ^ "\n" ^ (print_types(n_type)) ^"\n"); *)
                                         let micro_inf (term1, term2) = 
                                             match (term1, term2) with  
 
@@ -164,27 +170,18 @@ let solve expr =
                                                                                 let new_a = Impl (tree, b) in
                                                                                   no_type_checker a tree;
                                                                                   change_map types_map a new_a; 
-                                                                                  (* Hashtbl.remove sys2_map a; *)
-                                                                                  (* Hashtbl.add sys2_map a new_a; *)
-                                                                                  (* sys2counter := !sys2counter + 1 *)
                                                                                   b
                                             | (Impl(t11, t12), Vart v)       -> no_type_checker v t11;
                                                                                 change_map types_map v t11;
-                                                                                (* Hashtbl.remove sys2_map v; *)
-                                                                                (* Hashtbl.add sys2_map v t11; *)
-                                                                                (* sys2counter := !sys2counter + 1 *)
                                                                                 sub_term t12 v t11
                                           
                                                                                                   (* check if v in t11 *)
                                             | (Impl(tree1, res_type), tree2) -> let (system_map, count) = solve_system (tree1, tree2) in
-                                                                                for i = 0 to count do
-                                                                                  a_lot_subs types_map system_map(* ;
-                                                                                  a_lot_subs sys2_map system_map *)
-                                                                                done;
                                                                                 let res = ref res_type in
-                                                                                for i = 0 to count do
-                                                                                  res := big_sub system_map !res
-                                                                                done;
+                                                                                (* for i = 0 to count do *)
+                                                                                  a_lot_subs types_map system_map;
+                                                                                  res := big_sub system_map !res;
+                                                                                (* done; *)
                                                                                 !res
 
 
@@ -193,17 +190,44 @@ let solve expr =
 
                                 
           ) in
+
+          let flag = ref true in
           let free_set = get_set_with_free_vars expr in
           let expr_type = type_inference expr in
           let context = make_context free_set types_map expr in
             lambda_counter := 0;
           let advanced = ref Set.empty in
-            (*get_all was here *)
-            let flag = ref true in
+
+          (* let print_context = 
+            let costyl_space = ref true in
+             let costyl_space2 = ref false in 
+             if ((String.length context) > 0) then begin 
+                costyl_space := false;
+               Set.iter (fun abc -> 
+                print_string ", ";
+                print_string (Hashtbl.find lambda_map abc);
+                print_string " : ";
+                print_string (print_types(Hashtbl.find types_map abc))
+              ) !advanced;
+                print_string " keke "   
+               end
+              else begin
+               flag := true;
+               Set.iter (fun abc -> 
+                if !flag then flag := false else print_string ", ";
+                print_string (Hashtbl.find lambda_map abc);
+                print_string " : ";
+                print_string (print_types(Hashtbl.find types_map abc));
+                if !costyl_space then costyl_space2 := true
+              ) !advanced end;
+              if !costyl_space2 then print_string " "
+            in *)
+
             let rec print_all expr n = (
               match expr with
               | Var ( Id v )            ->  print_indent n;
                                             print_string context;
+
 
                                            let costyl_space = ref true in
                                            let costyl_space2 = ref false in 
@@ -213,9 +237,10 @@ let solve expr =
                                               print_string ", ";
                                               print_string (Hashtbl.find lambda_map abc);
                                               print_string " : ";
-                                              print_string (print_types(Hashtbl.find types_map abc));
+                                              print_string (print_types(Hashtbl.find types_map abc))
+                                            ) !advanced;
                                               print_string " "   
-                                            ) !advanced end
+                                             end
                                             else begin
                                              flag := true;
                                              Set.iter (fun abc -> 
@@ -226,12 +251,13 @@ let solve expr =
                                               if !costyl_space then costyl_space2 := true
                                             ) !advanced end;
                                             if !costyl_space2 then print_string " ";
+                                            (* print_context; *)
 
                                             print_string turniket;
                                             print_string (v ^ " : ");
                                             if not (Hashtbl.mem binds v) then
                                             print_string ((print_types (Hashtbl.find types_map v)) ^ " [rule #1]\n")
-                                          else begin (* print_string " keke "; *)
+                                          else begin
                                             print_string ((print_types (Hashtbl.find types_map ( Hashtbl.find binds v ))) ^ " [rule #1]\n")
                                           end
 
@@ -246,9 +272,10 @@ let solve expr =
                                               print_string ", ";
                                               print_string (Hashtbl.find lambda_map abc);
                                               print_string " : ";
-                                              print_string (print_types(Hashtbl.find types_map abc));
+                                              print_string (print_types(Hashtbl.find types_map abc))
+                                            ) !advanced;
                                               print_string " "   
-                                            ) !advanced end
+                                             end
                                             else begin
                                              flag := true;
                                              Set.iter (fun abc -> 
@@ -259,6 +286,7 @@ let solve expr =
                                               if !costyl_space then costyl_space2 := true
                                             ) !advanced end;
                                             if !costyl_space2 then print_string " ";
+                                            (* print_context; *)
                                            print_string turniket;
                                            print_string ((print_expr expr) ^ " : ");
                                            print_string (print_types (get_all expr ((int_of_string ocherednoy)-1) ));
@@ -282,9 +310,10 @@ let solve expr =
                                               print_string ", ";
                                               print_string (Hashtbl.find lambda_map abc);
                                               print_string " : ";
-                                              print_string (print_types(Hashtbl.find types_map abc));
+                                              print_string (print_types(Hashtbl.find types_map abc))
+                                            ) !advanced;
                                               print_string " "   
-                                            ) !advanced end
+                                             end
                                             else begin
                                              flag := true;
                                              Set.iter (fun abc -> 
@@ -295,7 +324,7 @@ let solve expr =
                                               if !costyl_space then costyl_space2 := true
                                             ) !advanced end;
                                             if !costyl_space2 then print_string " ";
-
+                                            (* print_context; *)
                                            print_string turniket;
                                            print_string ((print_expr expr) ^ " : ");
                                            print_string (print_types (get_all expr !lambda_counter));
