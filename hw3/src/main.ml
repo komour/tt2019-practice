@@ -85,7 +85,7 @@ let a_lot_subs types_map system_map =
 
 
 
-let turniket = " |- "
+let turniket = "|- "
 
 
 let solve expr = 
@@ -177,12 +177,13 @@ let solve expr =
                                         end
             | Appl ( _M, _N )         -> (
                                           let m_type = get_all _M number in
-                                          (* print_string " keke "; *)
+                                           (* print_string " keke ";  *)
                                           match m_type with
                                           | Impl (_, res) -> res
                                         )
-            | Abst ( Id x, t )        ->  let x_type = Hashtbl.find types_map (string_of_int number) in
-                                          Hashtbl.add binds x (string_of_int number);
+            | Abst ( Id x, t )        ->  let x_type = Hashtbl.find types_map (string_of_int (number+1)) in
+                                          (* print_string " keke\n "; *)
+                                          Hashtbl.add binds x (string_of_int (number+1));
                                           let t_type = get_all t (number + 1) in
                                           Hashtbl.remove binds x;
                                           Impl(x_type, t_type)
@@ -193,21 +194,27 @@ let solve expr =
               | Var ( Id v )            ->  print_indent n;
                                             print_string context;
 
-                                           if ((String.length context) > 0) then
+                                           let costyl_space = ref true in
+                                           let costyl_space2 = ref false in 
+                                           if ((String.length context) > 0) then begin 
+                                              costyl_space := false;
                                              Set.iter (fun abc -> 
                                               print_string ", ";
                                               print_string (Hashtbl.find lambda_map abc);
                                               print_string " : ";
-                                              print_string (print_types(Hashtbl.find types_map abc))  
-                                            ) !advanced
+                                              print_string (print_types(Hashtbl.find types_map abc));
+                                              print_string " "   
+                                            ) !advanced end
                                             else begin
                                              flag := true;
                                              Set.iter (fun abc -> 
                                               if !flag then flag := false else print_string ", ";
                                               print_string (Hashtbl.find lambda_map abc);
                                               print_string " : ";
-                                              print_string (print_types(Hashtbl.find types_map abc))  
+                                              print_string (print_types(Hashtbl.find types_map abc));
+                                              if !costyl_space then costyl_space2 := true
                                             ) !advanced end;
+                                            if !costyl_space2 then print_string " ";
 
                                             print_string turniket;
                                             print_string (v ^ " : ");
@@ -220,25 +227,30 @@ let solve expr =
               | Abst ( Id x, t )        -> let ocherednoy = get_lambda_name () in 
                                            print_indent n;
                                            print_string context;
-                                           if ((String.length context) > 0) then
+                                           let costyl_space = ref true in
+                                           let costyl_space2 = ref false in 
+                                           if ((String.length context) > 0) then begin 
+                                              costyl_space := false;
                                              Set.iter (fun abc -> 
                                               print_string ", ";
                                               print_string (Hashtbl.find lambda_map abc);
                                               print_string " : ";
-                                              print_string (print_types(Hashtbl.find types_map abc))  
-                                            ) !advanced
+                                              print_string (print_types(Hashtbl.find types_map abc));
+                                              print_string " "   
+                                            ) !advanced end
                                             else begin
                                              flag := true;
                                              Set.iter (fun abc -> 
                                               if !flag then flag := false else print_string ", ";
                                               print_string (Hashtbl.find lambda_map abc);
                                               print_string " : ";
-                                              print_string (print_types(Hashtbl.find types_map abc))  
+                                              print_string (print_types(Hashtbl.find types_map abc));
+                                              if !costyl_space then costyl_space2 := true
                                             ) !advanced end;
-
+                                            if !costyl_space2 then print_string " ";
                                            print_string turniket;
                                            print_string ((print_expr expr) ^ " : ");
-                                           print_string (print_types (get_all expr (int_of_string ocherednoy)));
+                                           print_string (print_types (get_all expr ((int_of_string ocherednoy)-1) ));
                                            print_string " [rule #3]\n";
                                            Hashtbl.add binds x ocherednoy;
                                            advanced := Set.union (!advanced) (Set.singleton ocherednoy);
@@ -251,21 +263,28 @@ let solve expr =
 
               | Appl ( _M, _N )         -> print_indent n;
                                            print_string context;
-                                           if ((String.length context) > 0) then
+                                           let costyl_space = ref true in
+                                           let costyl_space2 = ref false in 
+                                           if ((String.length context) > 0) then begin 
+                                              costyl_space := false;
                                              Set.iter (fun abc -> 
                                               print_string ", ";
                                               print_string (Hashtbl.find lambda_map abc);
                                               print_string " : ";
-                                              print_string (print_types(Hashtbl.find types_map abc))  
-                                            ) !advanced
+                                              print_string (print_types(Hashtbl.find types_map abc));
+                                              print_string " "   
+                                            ) !advanced end
                                             else begin
                                              flag := true;
                                              Set.iter (fun abc -> 
                                               if !flag then flag := false else print_string ", ";
                                               print_string (Hashtbl.find lambda_map abc);
                                               print_string " : ";
-                                              print_string (print_types(Hashtbl.find types_map abc))  
+                                              print_string (print_types(Hashtbl.find types_map abc));
+                                              if !costyl_space then costyl_space2 := true
                                             ) !advanced end;
+                                            if !costyl_space2 then print_string " ";
+
                                            print_string turniket;
                                            print_string ((print_expr expr) ^ " : ");
                                            print_string (print_types (get_all expr !lambda_counter));
