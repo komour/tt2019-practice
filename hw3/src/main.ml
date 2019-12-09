@@ -37,13 +37,18 @@ let change_map map prev_name new_tree =
         Hashtbl.add map key new_type
     )
   ) map
-(* TODO: Think about add and remove (dublicate adding) *)
 
 let no_type_checker var term =
   let rec checker tree =
   match tree with
   | Vart v              -> if v = var then raise No_Type
   | Impl (tree1, tree2) -> checker tree1; checker tree2
+ in
+  let temp_checker tree = 
+    match tree with
+    | Vart v1 -> ()
+    | _ -> checker tree
+
  in checker term 
 
 let solve_system (term1, term2) = 
@@ -161,6 +166,7 @@ let solve expr =
                                         let m_type' = ref (type_inference _M) in
                                         let n_type = (type_inference _N) in
                                         let m_type = get_all _M (tempc) in
+                                        (* print_string ((print_types m_type) ^ " kuka\n"); *)
                                         (* let n_type = get_all _N (tempc + !counter_temp) in *)
                                         (* if (tempc = 0) then print_string ( (print_types m_type) ^ "\n" ^ (print_types(n_type)) ^"\n"); *)
                                         let micro_inf (term1, term2) = 
@@ -171,6 +177,11 @@ let solve expr =
                                                                                   no_type_checker a tree;
                                                                                   change_map types_map a new_a; 
                                                                                   b
+                                            | (Impl(Vart v1, t12), Vart v2)  -> if (v1 = v2) then t12 else begin
+                                                                                  change_map types_map v2 (Vart v1);
+                                                                                  sub_term t12 v2 (Vart v1)
+                                                                                end
+
                                             | (Impl(t11, t12), Vart v)       -> no_type_checker v t11;
                                                                                 change_map types_map v t11;
                                                                                 sub_term t12 v t11
